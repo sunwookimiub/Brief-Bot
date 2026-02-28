@@ -1,0 +1,163 @@
+# ─────────────────────────────────────────────────────────────
+# deployment.yaml  — RAG API on GKE
+# ─────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rag-api
+  namespace: rag-system
+  labels:
+    app: rag-api
+    version: "1.0.0"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: rag-api
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0     # Zero-downtime deploys
+  template:
+    metadata:
+      labels:
+        app: rag-api
+    spec:
+      serviceAccountName: rag-api-sa  # Workload Identity for GCS access (no key files)
+
+      containers:
+        - name: rag-api
+          image: gcr.io/YOUR_PROJECT/rag-api:latest
+          ports:
+            - containerPort: 8080
+
+          env:
+            - name: GCS_BUCKET
+              valueFrom:
+                configMapKeyRef:
+                  name: rag-config
+                  key: gcs_bucket
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: rag-secrets
+                  key: anthropic_api_key
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: rag-secrets
+                  key: openai_api_key
+
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "2000m"
+              memory: "4Gi"
+
+          # ── Probes ──────────────────────────────────────────
+          # Readiness: K8s won't send traffic until vector DB is connected.
+          # "I set a readiness probe on /health so the load balancer holds
+          #  traffic during pod startup until ChromaDB is warm." (interview line)
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            failureThreshold: 3
+
+          # Liveness: Restart the pod if it becomes unresponsive
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            failureThreshold: 5
+
+          volumeMounts:
+            - name: chroma-storage
+              mountPath: /app/chroma_store
+
+      volumes:
+        - name: chroma-storage
+          persistentVolumeClaim:
+            claimName: chroma-pvc
+
+---
+# ─────────────────────────────────────────────────────────────
+# service.yaml  — Internal ClusterIP + external LoadBalancer
+# ─────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: rag-api-service
+  namespace: rag-system
+spec:
+  selector:
+    app: rag-api
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 8080
+  type: ClusterIP    # Nginx Ingress sits in front; don't expose directly
+
+---
+# ─────────────────────────────────────────────────────────────
+# ingress.yaml  — Nginx Ingress with streaming support
+# Interview point: "I configured proxy-read-timeout and
+# proxy-buffering off so Nginx doesn't buffer LLM SSE streams."
+# ─────────────────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: rag-api-ingress
+  namespace: rag-system
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"    # LLM responses can be slow
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"       # Critical for SSE streaming
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"    # Needed for chunked streaming
+spec:
+  rules:
+    - host: rag-api.your-domain.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: rag-api-service
+                port:
+                  number: 80
+
+---
+# ─────────────────────────────────────────────────────────────
+# pvc.yaml  — Persistent volume for ChromaDB
+# ─────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: chroma-pvc
+  namespace: rag-system
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+  storageClassName: standard-rwo   # GKE standard persistent disk
+
+---
+# ─────────────────────────────────────────────────────────────
+# namespace.yaml
+# ─────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: rag-system

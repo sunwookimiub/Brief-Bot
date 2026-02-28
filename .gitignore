@@ -1,0 +1,52 @@
+# Environment variables
+.env
+*.env
+
+# GCP Service Account Keys (SENSITIVE - never commit!)
+*-sa-key.json
+*-service-account*.json
+service_account*.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Vector DB local storage
+chroma_store/
+faiss_store/
+*.faiss
+*.pkl
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+*.ipynb
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
