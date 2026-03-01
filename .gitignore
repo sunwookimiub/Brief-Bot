@@ -50,3 +50,8 @@ logs/
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Temp / local test files
+body.json
+query.json
+*.pdf

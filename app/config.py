@@ -4,18 +4,18 @@ from typing import Optional
 
 class Settings(BaseSettings):
     # GCP
-    gcs_bucket: str = "your-docs-bucket"
+    gcs_bucket: str = "rag-docs-sunwookim"
     gcs_prompts_prefix: str = "prompts/"
-    google_cloud_project: str = "your-gcp-project"
+    google_cloud_project: str = "rag-system-2026"
 
     # LLM
     anthropic_api_key: Optional[str] = None
-    openai_api_key: Optional[str] = None
+    voyage_api_key: Optional[str] = None
     llm_provider: str = "anthropic"           # "anthropic" | "openai"
     llm_model: str = "claude-sonnet-4-6"
 
     # Embeddings
-    embedding_model: str = "text-embedding-3-small"
+    embedding_model: str = "voyage-3"
 
     # Vector DB  (ChromaDB local path or "faiss")
     vector_db_type: str = "chroma"            # "chroma" | "faiss"

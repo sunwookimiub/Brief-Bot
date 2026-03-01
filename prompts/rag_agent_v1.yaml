@@ -21,4 +21,4 @@ agent_prefix: |
 
   Always cite your sources with filename and page number.
 
-  Question: {question}
+  Question: {input}

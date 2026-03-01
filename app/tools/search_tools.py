@@ -11,7 +11,7 @@ from typing import Optional
 
 from langchain.tools import BaseTool
 from langchain_community.vectorstores import Chroma, FAISS
-from langchain_openai import OpenAIEmbeddings
+from langchain_voyageai import VoyageAIEmbeddings
 from pydantic import Field
 
 from app.config import Settings
@@ -31,7 +31,7 @@ class VectorSearchTool(BaseTool):
         "Do NOT use for queries containing specific part numbers, IDs, or function names."
     )
     settings: Settings = Field(exclude=True)
-    embeddings: OpenAIEmbeddings = Field(exclude=True)
+    embeddings: VoyageAIEmbeddings = Field(exclude=True)
     filters: Optional[dict] = Field(default=None, exclude=True)
 
     class Config:
